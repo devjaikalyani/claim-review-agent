@@ -1,0 +1,36 @@
+# Secrets — never commit credentials
+.env
+.env.*
+*.env
+
+# Databases (persistent data — back these up separately)
+# Use db_example/setup.py to recreate them locally.
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# Uploaded files
+temp_uploads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test receipts (don't commit real employee data)
+Receipts for claim/
+
+# Presentations / diagrams
+*.pptx
+*.ppt
+*.png
+*.jpg
+*.jpeg

@@ -1,0 +1,14 @@
+[theme]
+# Base = dark — keeps the loading screen dark (matching the default Dark theme).
+# Light-theme widget overrides are handled via CSS injection in app.py.
+base                     = "dark"
+primaryColor             = "#00AFEF"
+backgroundColor          = "#040e1f"
+secondaryBackgroundColor = "#071629"
+textColor                = "#f7f4ed"
+font                     = "sans serif"
+
+[server]
+headless = true
+address = "0.0.0.0"
+port = 8502
