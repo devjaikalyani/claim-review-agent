@@ -1,5 +1,5 @@
 """
-LangGraph Pipeline for Claim Review
+LangGraph Pipeline for Rite Audit System
 
 Flow:
     orchestrator → ingestion → data → admin_judgment → critic1 → calculator → critic2 → writer → critic3 → END

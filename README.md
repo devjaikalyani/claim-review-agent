@@ -1,4 +1,4 @@
-# Claim Review Agent
+# Rite Audit System
 
 An AI-powered multi-agent system for reviewing employee expense claims. Built with LangGraph, Claude Vision, and Streamlit.
 
@@ -18,7 +18,7 @@ Employees submit expense claims with receipts and supporting documents. The syst
 ## Project Structure
 
 ```
-Claim Review Agent/
+Rite Audit System/
 |-- app.py                      # Streamlit web application (main entry point)
 |-- graph.py                    # LangGraph pipeline definition
 |-- admin_dashboard.py          # Admin dashboard and claim review pages

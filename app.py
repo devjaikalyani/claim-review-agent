@@ -1,5 +1,5 @@
 """
-Streamlit Application for Employee Claim Review.
+Streamlit Application for Employee Rite Audit System.
 
 Two-step UX:
 1. Claim submission page
@@ -10,7 +10,10 @@ import sys
 import uuid
 from datetime import datetime, timedelta
 
+import logging
 import streamlit as st
+
+logging.getLogger("tornado.websocket").setLevel(logging.ERROR)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -69,7 +72,7 @@ def _sanitize_for_pdf(text: str) -> str:
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
-def build_pdf_report(report_text: str, title: str = "Claim Review Report") -> bytes:
+def build_pdf_report(report_text: str, title: str = "Rite Audit System Report") -> bytes:
     """Generate a PDF using fpdf2 with proper Unicode and auto page breaks."""
     from fpdf import FPDF
 
@@ -102,6 +105,53 @@ def _cleanup_temp_files(image_paths: list[str]) -> None:
             pass
     try:
         os.rmdir("temp_uploads")
+    except OSError:
+        pass
+
+
+# ── Vision scan disk cache ─────────────────────────────────────────────────────
+# Survives laptop sleep / WebSocket reconnects.  Cache is keyed by a SHA-256
+# hash of all uploaded file bytes, stored as JSON in temp_uploads/.scan_cache/
+
+import hashlib, json as _json
+
+_SCAN_CACHE_DIR = os.path.join("temp_uploads", ".scan_cache")
+
+
+def _vision_cache_key(image_paths: list[str]) -> str:
+    h = hashlib.sha256()
+    for p in sorted(image_paths):          # sorted so order doesn't matter
+        try:
+            with open(p, "rb") as f:
+                h.update(f.read())
+        except OSError:
+            h.update(p.encode())
+    return h.hexdigest()
+
+
+def _load_vision_cache(key: str):
+    path = os.path.join(_SCAN_CACHE_DIR, f"{key}.json")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return _json.load(f)
+    except (OSError, _json.JSONDecodeError):
+        return None
+
+
+def _save_vision_cache(key: str, result: dict) -> None:
+    os.makedirs(_SCAN_CACHE_DIR, exist_ok=True)
+    path = os.path.join(_SCAN_CACHE_DIR, f"{key}.json")
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            _json.dump(result, f)
+    except OSError:
+        pass
+
+
+def _delete_vision_cache(key: str) -> None:
+    path = os.path.join(_SCAN_CACHE_DIR, f"{key}.json")
+    try:
+        os.remove(path)
     except OSError:
         pass
 
@@ -1555,7 +1605,7 @@ def render_sidebar() -> None:
         st.markdown("---")
         st.markdown("### Tech Stack")
         st.caption("**UI:** Streamlit")
-        st.caption("**AI Models:** Claude Sonnet 4.6 (judgment) · Claude Haiku 4.5 (OCR/vision)")
+        st.caption("**Powered by:** Rite Audit Agent (judgment) · Rite Audit Agent (OCR/vision)")
         st.caption("**AI Framework:** LangGraph + LangChain (9-node workflow)")
         st.caption("**Prompt Caching:** Anthropic cache_control (cost optimisation)")
         st.caption("**Database:** SQLite (claims · auth · training)")
@@ -1589,7 +1639,7 @@ def render_submission_page() -> None:
         f"""
         <div class="hero-card">
             <div class="hero-kicker">AI Expense Review</div>
-            <div class="hero-title">Claim Review System</div>
+            <div class="hero-title">Rite Audit System</div>
             <p class="hero-copy">
                 Submit once. Review on the next screen.
             </p>
@@ -1709,26 +1759,28 @@ def _build_line_items(result: dict) -> list:
         sys_decision = "partial" if is_partial or (sys_approved < amt * 0.99) else "approve"
 
         items.append({
-            "description":           exp.get("description", ""),
-            "date":                  exp.get("date", ""),
-            "category":              cat,
-            "claimed_amount":        amt,
-            "system_decision":       sys_decision,
+            "description":            exp.get("description", ""),
+            "date":                   exp.get("date", ""),
+            "category":               cat,
+            "claimed_amount":         amt,
+            "system_decision":        sys_decision,
             "system_approved_amount": sys_approved,
-            "system_reason":         notes,
-            "source_type":           exp.get("source_type", "receipt"),
+            "system_reason":          notes,
+            "system_confidence":      exp.get("system_confidence"),
+            "source_type":            exp.get("source_type", "receipt"),
         })
 
     for rej in result.get("rejected_expenses", []):
         items.append({
-            "description":           rej.get("description", ""),
-            "date":                  rej.get("date", ""),
-            "category":              rej.get("category", "other"),
-            "claimed_amount":        float(rej.get("amount") or 0),
-            "system_decision":       "reject",
+            "description":            rej.get("description", ""),
+            "date":                   rej.get("date", ""),
+            "category":               rej.get("category", "other"),
+            "claimed_amount":         float(rej.get("amount") or 0),
+            "system_decision":        "reject",
             "system_approved_amount": 0.0,
-            "system_reason":         rej.get("system_reason", ""),
-            "source_type":           rej.get("source_type", "receipt"),
+            "system_reason":          rej.get("system_reason", ""),
+            "system_confidence":      rej.get("system_confidence"),
+            "source_type":            rej.get("source_type", "receipt"),
         })
 
     return items
@@ -1776,50 +1828,68 @@ def _process_submission(
     status      = st.empty()
 
     try:
-        # Step 1: Vision scan — live progress as each batch/PDF finishes
-        total_files = len(image_paths)
-        scan_label  = st.empty()   # live "Scanning X / Y" text
-        scan_label.markdown(
-            f"**Scanning documents…** &nbsp; 0 / {total_files} files processed",
-            unsafe_allow_html=True,
-        )
-        progress.progress(5)
+        # Step 1: Vision scan — resume from disk cache if laptop slept mid-scan
+        total_files    = len(image_paths)
+        _cache_key     = _vision_cache_key(image_paths)
+        vision_result  = _load_vision_cache(_cache_key)
 
-        # Estimate API jobs: images batch at 4, PDF receipts batch at 2, voucher PDFs are 1 each
-        # (exact split unknown here — use a conservative estimate for the progress bar)
-        import math as _math
-        _pdf_count = sum(1 for p in image_paths if p.lower().endswith(".pdf"))
-        _img_count = total_files - _pdf_count
-        _total_jobs = max(1, _math.ceil(_img_count / 4) + _math.ceil(_pdf_count / 2))
-        _files_per_job = max(1, total_files / _total_jobs)
+        scan_label = st.empty()
 
-        def _on_scan_progress(done, total, label):
-            approx_files = min(total_files, round(done * _files_per_job))
-            pct = 5 + int(35 * done / max(1, total))   # 5 % → 40 %
-            progress.progress(pct)
+        if vision_result is not None:
+            # Restored from cache — skip all API calls
+            _r_ok  = len(vision_result.get("receipts", []))
+            _r_err = len(vision_result.get("errors", []))
+            _r_amt = vision_result.get("total_extracted", 0)
+            _summary_parts = [f"**{_r_ok}** receipt{'s' if _r_ok != 1 else ''} scanned"]
+            if _r_ok:
+                _summary_parts.append(f"Rs.{_r_amt:,.2f} extracted")
+            if _r_err:
+                _summary_parts.append(f"⚠️ {_r_err} file{'s' if _r_err != 1 else ''} could not be read")
             scan_label.markdown(
-                f"**Scanning documents…** &nbsp;"
-                f"<span style='color:#94a3b8'>{approx_files} / {total_files} files</span>"
-                f"<br><span style='font-size:0.8rem;color:#64748b'>Processing: {label}</span>",
+                "Scan restored from cache — " + "  ·  ".join(_summary_parts),
                 unsafe_allow_html=True,
             )
+            progress.progress(40)
+        else:
+            scan_label.markdown(
+                f"**Scanning documents…** &nbsp; 0 / {total_files} files processed",
+                unsafe_allow_html=True,
+            )
+            progress.progress(5)
 
-        vision_result = scan_receipts(image_paths, on_progress=_on_scan_progress)
+            import math as _math
+            _pdf_count    = sum(1 for p in image_paths if p.lower().endswith(".pdf"))
+            _img_count    = total_files - _pdf_count
+            _total_jobs   = max(1, _math.ceil(_img_count / 4) + _math.ceil(_pdf_count / 2))
+            _files_per_job = max(1, total_files / _total_jobs)
 
-        # Summarise scan outcome
-        _r_ok  = len(vision_result.get("receipts", []))
-        _r_err = len(vision_result.get("errors", []))
-        _r_amt = vision_result.get("total_extracted", 0)
-        _summary_parts = [f"**{_r_ok}** receipt{'s' if _r_ok != 1 else ''} scanned"]
-        if _r_ok:
-            _summary_parts.append(f"Rs.{_r_amt:,.2f} extracted")
-        if _r_err:
-            _summary_parts.append(f"⚠️ {_r_err} file{'s' if _r_err != 1 else ''} could not be read")
-        scan_label.markdown(
-            "Scan complete — " + "  ·  ".join(_summary_parts),
-            unsafe_allow_html=True,
-        )
-        progress.progress(40)
+            def _on_scan_progress(done, total, label):
+                approx_files = min(total_files, round(done * _files_per_job))
+                pct = 5 + int(35 * done / max(1, total))
+                progress.progress(pct)
+                scan_label.markdown(
+                    f"**Scanning documents…** &nbsp;"
+                    f"<span style='color:#94a3b8'>{approx_files} / {total_files} files</span>"
+                    f"<br><span style='font-size:0.8rem;color:#64748b'>Processing: {label}</span>",
+                    unsafe_allow_html=True,
+                )
+
+            vision_result = scan_receipts(image_paths, on_progress=_on_scan_progress)
+            _save_vision_cache(_cache_key, vision_result)   # persist so sleep won't force rescan
+
+            _r_ok  = len(vision_result.get("receipts", []))
+            _r_err = len(vision_result.get("errors", []))
+            _r_amt = vision_result.get("total_extracted", 0)
+            _summary_parts = [f"**{_r_ok}** receipt{'s' if _r_ok != 1 else ''} scanned"]
+            if _r_ok:
+                _summary_parts.append(f"Rs.{_r_amt:,.2f} extracted")
+            if _r_err:
+                _summary_parts.append(f"⚠️ {_r_err} file{'s' if _r_err != 1 else ''} could not be read")
+            scan_label.markdown(
+                "Scan complete — " + "  ·  ".join(_summary_parts),
+                unsafe_allow_html=True,
+            )
+            progress.progress(40)
 
         needs_unolo         = vision_result.get("needs_unolo", False)
         odometer_readings   = vision_result.get("odometer_readings", [])
@@ -1958,6 +2028,7 @@ def _process_submission(
         }
         st.session_state["page"] = "result"
         _cleanup_temp_files(image_paths)
+        _delete_vision_cache(_cache_key)   # pipeline done — cache no longer needed
         st.rerun()
 
     except Exception as exc:
@@ -2075,31 +2146,24 @@ def render_result_page() -> None:
     )
 
     # ── Download PDF ──────────────────────────────────────────────────────────
-    voucher_pdf       = st.session_state.get("last_voucher_pdf")
-    voucher_pdf_name  = st.session_state.get("last_voucher_pdf_name") or f"{claim_id}_voucher.pdf"
     dl_col, _ = st.columns([1, 3])
     with dl_col:
-        if voucher_pdf:
+        try:
+            from utils.audit_pdf import generate_audit_pdf
+            form_snap = st.session_state.get("last_form_snapshot", {})
+            pdf_bytes = generate_audit_pdf(result, form_snap)
             st.download_button(
-                "Download Reviewed Voucher PDF",
-                data=voucher_pdf,
-                file_name=voucher_pdf_name,
+                "Download Audit Report",
+                data=pdf_bytes,
+                file_name=f"{claim_id}_audit_report.pdf",
                 mime="application/pdf",
                 width="stretch",
                 type="primary",
             )
-        else:
-            try:
-                pdf_bytes = build_pdf_report(report_text, f"Claim Review — {claim_id}")
-                st.download_button(
-                    "Download PDF Report",
-                    data=pdf_bytes,
-                    file_name=f"{claim_id}_report.pdf",
-                    mime="application/pdf",
-                    width="stretch",
-                )
-            except Exception:
-                st.caption("PDF library not installed (pip install fpdf2)")
+        except ImportError:
+            st.caption("PDF library not installed (pip install fpdf2)")
+        except Exception as _pdf_err:
+            st.warning(f"PDF generation failed: {_pdf_err}")
 
     # ── SpineHR status ────────────────────────────────────────────────────────
     if spinehr_sub:
@@ -3180,7 +3244,7 @@ def render_auth_page() -> None:
             f'<img src="{_LOGO_URL}" style="height:90px;width:auto;object-fit:contain" alt="Rite Water Solutions">'
             f'</div>'
             f'<div class="auth-brand-kicker">Employee Portal</div>'
-            f'<div class="auth-hero-title">Claim Review<br>System</div>'
+            f'<div class="auth-hero-title">Rite Audit<br>System</div>'
             f'<p class="auth-hero-sub">AI-powered expense claim processing for Rite Water Solutions employees.</p>'
             f'<div class="auth-hero-features">'
             f'<div class="auth-hero-feature"><span class="auth-hero-icon">&#9679;</span><span>Instant receipt scanning with AI Vision</span></div>'
@@ -3241,7 +3305,7 @@ def render_auth_page() -> None:
 
 def main() -> None:
     st.set_page_config(
-        page_title="AI Claim Review System",
+        page_title="Rite Audit System",
         page_icon="AI",
         layout="wide",
     )

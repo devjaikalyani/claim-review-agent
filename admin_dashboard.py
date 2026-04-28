@@ -10,8 +10,10 @@ import json
 import uuid
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 
+
+_PAGE_SIZE = 10   # claims per page in the admin list
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -75,12 +77,24 @@ def render_dashboard_page() -> None:
     db    = _get_db()
     stats = db.get_claim_stats()
 
-    # Summary cards
+    # Summary cards — row 1
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Claims",         stats.get("total", 0))
     c2.metric("Pending Review",       stats.get("pending", 0))
     c3.metric("Total Claimed",        _fmt_inr(stats.get("total_claimed")))
     c4.metric("Total Final Approved", _fmt_inr(stats.get("total_final_approved")))
+
+    # Summary cards — row 2
+    total_claimed = stats.get("total_claimed") or 0
+    total_final   = stats.get("total_final_approved") or 0
+    approval_rate = round(total_final / total_claimed * 100, 1) if total_claimed else None
+    overrides     = int(stats.get("total_overrides") or 0)
+    avg_days      = stats.get("avg_review_days")
+
+    r1, r2, r3 = st.columns(3)
+    r1.metric("Approval Rate",    f"{approval_rate:.1f}%" if approval_rate is not None else "—")
+    r2.metric("Admin Overrides",  overrides)
+    r3.metric("Avg. Review Time", f"{avg_days:.1f} days" if avg_days is not None else "—")
 
     # ── Clear test claims ──────────────────────────────────────────
     test_count = _count_test_claims(db)
@@ -110,7 +124,17 @@ def render_dashboard_page() -> None:
 
 
 def _render_claims_table(db, status_filter: str, tab_key: str = "all") -> None:
-    claims = db.get_all_claims(status_filter=status_filter)
+    pg_key = f"pg_{tab_key}"
+    if pg_key not in st.session_state:
+        st.session_state[pg_key] = 0
+
+    total       = db.count_claims(status_filter=status_filter)
+    total_pages = max(1, (total + _PAGE_SIZE - 1) // _PAGE_SIZE)
+    page        = min(st.session_state[pg_key], total_pages - 1)
+    st.session_state[pg_key] = page
+    offset      = page * _PAGE_SIZE
+
+    claims = db.get_all_claims(status_filter=status_filter, limit=_PAGE_SIZE, offset=offset)
 
     if not claims:
         st.info("No claims found.")
@@ -134,7 +158,14 @@ def _render_claims_table(db, status_filter: str, tab_key: str = "all") -> None:
 
             with col_info:
                 st.markdown(f"**{name}**")
-                st.caption(f"{period}  |  Submitted {submitted}")
+                age_str = ""
+                if submitted and status == "pending_review":
+                    try:
+                        age_days = (date.today() - date.fromisoformat(submitted)).days
+                        age_str = f"  ·  {age_days}d pending"
+                    except Exception:
+                        pass
+                st.caption(f"{period}  |  Submitted {submitted}{age_str}")
                 st.caption(f"ID: `{claim_id}`")
 
             with col_amounts:
@@ -159,6 +190,25 @@ def _render_claims_table(db, status_filter: str, tab_key: str = "all") -> None:
                     st.rerun()
 
             st.divider()
+
+    # Pagination controls
+    if total_pages > 1:
+        pc_left, pc_mid, pc_right = st.columns([1, 3, 1])
+        with pc_left:
+            if st.button("← Prev", key=f"prev_{tab_key}",
+                         disabled=(page == 0), use_container_width=True):
+                st.session_state[pg_key] = page - 1
+                st.rerun()
+        with pc_mid:
+            st.caption(
+                f"Page {page + 1} of {total_pages}  ·  {total} claim(s) total",
+                help=f"Showing {offset + 1}–{min(offset + _PAGE_SIZE, total)} of {total}",
+            )
+        with pc_right:
+            if st.button("Next →", key=f"next_{tab_key}",
+                         disabled=(page >= total_pages - 1), use_container_width=True):
+                st.session_state[pg_key] = page + 1
+                st.rerun()
 
 
 # ── Report tab renderer ───────────────────────────────────────────────────────
@@ -233,7 +283,13 @@ def render_admin_review_page() -> None:
     period = _period_label(claim.get("claim_period_start", ""), claim.get("claim_period_end", ""))
     st.markdown(f"## {name}  —  {period}")
 
-    h1, h2, h3, h4 = st.columns(4)
+    # Compute avg AI confidence from stored line items
+    _items_for_conf = db.get_line_items(claim_id)
+    _confs = [float(it["system_confidence"]) for it in _items_for_conf
+              if it.get("system_confidence") is not None]
+    avg_conf = round(sum(_confs) / len(_confs) * 100) if _confs else None
+
+    h1, h2, h3, h4, h5 = st.columns(5)
     h1.metric("Claimed",         _fmt_inr(claim.get("claimed_amount")))
     h2.metric("System Approved", _fmt_inr(claim.get("approved_amount")))
     h3.metric(
@@ -241,7 +297,35 @@ def render_admin_review_page() -> None:
         _fmt_inr(claim.get("admin_approved_amount"))
         if claim.get("admin_approved_amount") is not None else "—",
     )
-    h4.metric("Status", _status_label(claim.get("admin_status", "pending_review")))
+    h4.metric("AI Confidence",   f"{avg_conf}%" if avg_conf is not None else "—")
+    h5.metric("Status",          _status_label(claim.get("admin_status", "pending_review")))
+
+    cat_eligible = {}
+    try:
+        raw = claim.get("category_eligible_json")
+        if raw:
+            cat_eligible = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        pass
+
+    if cat_eligible:
+        claimed_total = float(claim.get("claimed_amount") or 1)
+        with st.expander("Category Breakdown", expanded=False):
+            hdr = st.columns([3, 2, 2])
+            hdr[0].markdown("**Category**")
+            hdr[1].markdown("**Eligible**")
+            hdr[2].markdown("**% of Claimed**")
+            def _elig_val(v):
+                if isinstance(v, dict):
+                    return float(v.get("eligible") or 0)
+                return float(v or 0)
+
+            for cat, eligible in sorted(cat_eligible.items(), key=lambda x: -_elig_val(x[1])):
+                elig_amount = _elig_val(eligible)
+                row = st.columns([3, 2, 2])
+                row[0].write(str(cat).replace("_", " ").title())
+                row[1].write(_fmt_inr(elig_amount))
+                row[2].write(f"{elig_amount / claimed_total * 100:.1f}%")
 
     st.markdown("---")
 
@@ -279,13 +363,13 @@ def _render_line_items_editor(db, claim: dict, claim_id: str) -> None:
         if f"rsn_{claim_id}_{i}" not in st.session_state:
             st.session_state[f"rsn_{claim_id}_{i}"] = item.get("system_reason", "") or ""
 
-    COL_W = [3.2, 1, 1.2, 0.9, 0.85, 1.15, 0.9, 2.4]
+    COL_W = [3.0, 1, 1.2, 0.85, 0.75, 0.75, 1.15, 0.9, 2.4]
 
     # ── Column headers ─────────────────────────────────────────────
     hdr_cols = st.columns(COL_W)
     for col, label in zip(hdr_cols, [
         "Description", "Date", "Category", "Claimed (Rs.)",
-        "System", "Admin Decision", "Approved (Rs.)", "Reason / Notes",
+        "System", "AI Conf.", "Admin Decision", "Approved (Rs.)", "Reason / Notes",
     ]):
         col.markdown(
             f"<p style='margin:0 0 2px;font-size:0.76rem;font-weight:700;"
@@ -331,24 +415,44 @@ def _render_line_items_editor(db, claim: dict, claim_id: str) -> None:
             f"color:{dec_color}'>{sys_dec}</div>",
             unsafe_allow_html=True,
         )
-        with row[5]:
+        # Confidence indicator
+        raw_conf = item.get("system_confidence")
+        if raw_conf is not None:
+            conf_pct = int(float(raw_conf) * 100)
+            conf_color = (
+                "#16a34a" if conf_pct >= 90 else
+                "#d97706" if conf_pct >= 70 else
+                "#dc2626"
+            )
+            row[5].markdown(
+                f"<div style='padding:6px 2px;font-size:0.82rem;font-weight:700;"
+                f"color:{conf_color}'>{conf_pct}%</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            row[5].markdown(
+                "<div style='padding:6px 2px;font-size:0.82rem;color:#6b7280'>—</div>",
+                unsafe_allow_html=True,
+            )
+        with row[6]:
             st.selectbox(
                 "Admin Decision", ["approve", "reject", "partial"],
                 key=f"dec_{claim_id}_{i}",
                 label_visibility="collapsed",
             )
-        with row[6]:
+        with row[7]:
             st.number_input(
                 "Approved Rs.", min_value=0.0, format="%.2f",
                 key=f"amt_{claim_id}_{i}",
                 label_visibility="collapsed",
             )
-        with row[7]:
-            st.text_input(
+        with row[8]:
+            st.text_area(
                 "Reason",
                 key=f"rsn_{claim_id}_{i}",
                 label_visibility="collapsed",
                 placeholder="reason…",
+                height=68,
             )
 
         cur_dec = st.session_state.get(f"dec_{claim_id}_{i}", sys_dec)
