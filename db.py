@@ -110,6 +110,25 @@ class ClaimDatabase:
             if col not in existing:
                 cursor.execute(f"ALTER TABLE claims ADD COLUMN {col} {col_def}")
 
+        # Admin decision history — full before/after audit trail for every override
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS admin_decision_history (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_id             TEXT NOT NULL,
+                changed_by           TEXT,
+                old_approved_amount  REAL,
+                new_approved_amount  REAL,
+                old_status           TEXT,
+                new_status           TEXT DEFAULT 'admin_reviewed',
+                notes                TEXT,
+                changed_at           TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (claim_id) REFERENCES claims(id)
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_adh_claim_id ON admin_decision_history(claim_id)"
+        )
+
         # Indexes for admin dashboard queries
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_claims_admin_status ON claims(admin_status, created_at)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_claims_employee_id  ON claims(employee_id)")
@@ -391,22 +410,51 @@ class ClaimDatabase:
         claim_id: str,
         admin_approved_amount: float,
         admin_notes: str = "",
+        changed_by: str = "",
     ) -> None:
-        """Persist admin's final decision on a claim."""
+        """Persist admin's final decision on a claim and record full audit history."""
         cursor = self.conn.cursor()
+
+        # Read current state before overwriting (for audit trail)
+        current = cursor.execute(
+            "SELECT approved_amount, admin_approved_amount, admin_status FROM claims WHERE id=?",
+            (claim_id,),
+        ).fetchone()
+        old_amount = None
+        old_status = None
+        if current:
+            old_amount = current["admin_approved_amount"] if current["admin_approved_amount"] is not None \
+                         else current["approved_amount"]
+            old_status = current["admin_status"]
+
+        now = datetime.now().isoformat()
+
+        # Write audit history entry
+        cursor.execute("""
+            INSERT INTO admin_decision_history
+              (claim_id, changed_by, old_approved_amount, new_approved_amount,
+               old_status, new_status, notes, changed_at)
+            VALUES (?, ?, ?, ?, ?, 'admin_reviewed', ?, ?)
+        """, (claim_id, changed_by, old_amount, admin_approved_amount, old_status, admin_notes, now))
+
+        # Update the claim record
         cursor.execute("""
             UPDATE claims
             SET admin_approved_amount=?, admin_status='admin_reviewed',
                 admin_reviewed_at=?, admin_notes=?, updated_at=?
             WHERE id=?
-        """, (
-            admin_approved_amount,
-            datetime.now().isoformat(),
-            admin_notes,
-            datetime.now().isoformat(),
-            claim_id,
-        ))
+        """, (admin_approved_amount, now, admin_notes, now, claim_id))
+
         self.conn.commit()
+
+    def get_admin_decision_history(self, claim_id: str) -> List[Dict[str, Any]]:
+        """Return all admin override events for a claim, newest first."""
+        cursor = self.conn.cursor()
+        rows = cursor.execute(
+            "SELECT * FROM admin_decision_history WHERE claim_id=? ORDER BY changed_at DESC",
+            (claim_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_line_items(self, claim_id: str) -> List[Dict[str, Any]]:
         """Return stored line items for a claim (for admin review)."""
