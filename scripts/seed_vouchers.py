@@ -1,4 +1,4 @@
-"""
+﻿"""
 Seed training DB with 10 real expense vouchers.
 Run from the project root:  python scripts/seed_vouchers.py
 """
@@ -15,7 +15,7 @@ def _item(desc, claimed, approved):
 
 VOUCHERS = [
 
-    # ── Voucher 2607 — Kartik Dhobale, Dec 2025 ──────────────────────────────
+    # â”€â”€ Voucher 2607 â€” Kartik Dhobale, Dec 2025 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "2607",
         "categories": {
@@ -61,7 +61,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 2098 — Vaibhav Puntambekar, Oct 2025 (full approval) ─────────
+    # â”€â”€ Voucher 2098 â€” Vaibhav Puntambekar, Oct 2025 (full approval) â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "2098",
         "categories": {
@@ -90,7 +90,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 2126 — Jai Dutt Sharma, Oct-Nov 2025 ─────────────────────────
+    # â”€â”€ Voucher 2126 â€” Jai Dutt Sharma, Oct-Nov 2025 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "2126",
         "categories": {
@@ -145,7 +145,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 3122 — Arpit Pandit, Mar-Dec 2025 (FULL REJECTION) ───────────
+    # â”€â”€ Voucher 3122 â€” Arpit Pandit, Mar-Dec 2025 (FULL REJECTION) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "3122",
         "categories": {
@@ -171,7 +171,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 3410 — Sachin Patil, Mar 2026 (FULL REJECTION) ───────────────
+    # â”€â”€ Voucher 3410 â€” Sachin Patil, Mar 2026 (FULL REJECTION) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "3410",
         "categories": {
@@ -198,7 +198,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 3315 — Jai Dutt Sharma, Feb-Mar 2026 ─────────────────────────
+    # â”€â”€ Voucher 3315 â€” Jai Dutt Sharma, Feb-Mar 2026 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "3315",
         "categories": {
@@ -227,7 +227,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 3071 — Kunal Sonawane, Feb 2026 ───────────────────────────────
+    # â”€â”€ Voucher 3071 â€” Kunal Sonawane, Feb 2026 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "3071",
         "categories": {
@@ -280,7 +280,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 3383 — Kunal Sonawane, Mar 2026 ───────────────────────────────
+    # â”€â”€ Voucher 3383 â€” Kunal Sonawane, Mar 2026 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "3383",
         "categories": {
@@ -313,7 +313,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 2955 — Mithun Jibhkate, Dec 2025-Feb 2026 (full approval) ────
+    # â”€â”€ Voucher 2955 â€” Mithun Jibhkate, Dec 2025-Feb 2026 (full approval) â”€â”€â”€â”€
     {
         "voucher_no": "2955",
         "categories": {
@@ -385,7 +385,7 @@ VOUCHERS = [
         },
     },
 
-    # ── Voucher 2610 — Mithun Jibhkate, Nov-Dec 2025 ─────────────────────────
+    # â”€â”€ Voucher 2610 â€” Mithun Jibhkate, Nov-Dec 2025 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         "voucher_no": "2610",
         "categories": {
@@ -453,5 +453,6 @@ if __name__ == "__main__":
             print(f"  Voucher {vno}: inserted {n} rows")
             total_rows += n
         else:
-            print(f"  Voucher {vno}: already exists — skipped")
+            print(f"  Voucher {vno}: already exists â€” skipped")
     print(f"\nDone. {total_rows} new training rows added.")
+

@@ -75,12 +75,12 @@ def setup_auth_db() -> None:
     # Admin employee IDs come from ADMIN_EMPLOYEE_IDS env var at runtime.
     # Mark the two sample admins here so the dev DB is ready without setting env.
     sample_employees = [
-        ("RWSIPL001", "Priya Sharma",  "priya.sharma@ritewater.in",   0),
-        ("RWSIPL002", "Rahul Verma",   "rahul.verma@ritewater.in",    0),
-        ("RWSIPL003", "Anita Desai",   "anita.desai@ritewater.in",    0),
-        ("RWSIPL004", "Suresh Nair",   "suresh.nair@ritewater.in",    0),
-        ("RWSIPL493", "Admin User",    "admin@ritewater.in",          1),
-        ("TRWSIPL834", "Admin Two",    "admin2@ritewater.in",         1),
+        ("EMP001", "Sample User One",   "user1@example.com",   0),
+        ("EMP002", "Sample User Two",   "user2@example.com",   0),
+        ("EMP003", "Sample User Three", "user3@example.com",   0),
+        ("EMP004", "Sample User Four",  "user4@example.com",   0),
+        ("EMP005", "Admin User",        "admin@example.com",   1),
+        ("EMP006", "Admin Two",         "admin2@example.com",  1),
     ]
 
     now = datetime.now().isoformat()
@@ -96,7 +96,7 @@ def setup_auth_db() -> None:
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (user_id, emp_id, name, email, _hash_pw(emp_id), is_admin, now),
             )
-            print(f"  User: {emp_id} / {name}  (default password: {emp_id})")
+            print(f"  Created user: {emp_id} / {name}")
 
     conn.commit()
     conn.close()
@@ -185,7 +185,7 @@ def setup_claims_db() -> None:
                 claimed_amount, approved_amount,
                 decision, status, admin_status, created_at, updated_at)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (c1_id, "RWSIPL001", "Priya Sharma", today,
+            (c1_id, "EMP001", "Sample User One", today,
              "2025-11-01", "2025-11-15",
              3500.0, 3200.0,
              "approved_partial",
@@ -219,7 +219,7 @@ def setup_claims_db() -> None:
                 claim_period_start, claim_period_end,
                 claimed_amount, status, admin_status, created_at, updated_at)
                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (c2_id, "RWSIPL002", "Rahul Verma", today,
+            (c2_id, "EMP002", "Sample User Two", today,
              "2025-11-16", "2025-11-30",
              5200.0,
              "pending", "pending_review",
@@ -271,4 +271,4 @@ if __name__ == "__main__":
     setup_training_db()
     print()
     print("Done. Start the app with: streamlit run app.py")
-    print("Admin employees: RWSIPL493, TRWSIPL834  (set ADMIN_EMPLOYEE_IDS env var to change)")
+    print("Set ADMIN_EMPLOYEE_IDS env var to define admin employee codes.")
