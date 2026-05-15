@@ -1,5 +1,5 @@
 """
-State definition for the Claim Review Agent pipeline.
+State definition for the Rite Audit System pipeline.
 Uses TypedDict for LangGraph state management.
 """
 from typing import TypedDict, List, Optional, Dict, Any, Literal
@@ -9,12 +9,14 @@ from enum import Enum
 
 class ExpenseCategory(str, Enum):
     """Categories of expenses that can be claimed."""
-    TWO_WHEELER   = "two_wheeler"
-    BUS_TRAVEL    = "bus_travel"
-    FASTTAG       = "fasttag"
-    FOOD          = "food"
-    SITE_EXPENSES = "site_expenses"
-    OTHER         = "other"
+    TWO_WHEELER    = "two_wheeler"
+    CAR_CONVEYANCE = "car_conveyance"
+    BUS_TRAVEL     = "bus_travel"
+    FASTTAG        = "fasttag"
+    FOOD           = "food"
+    HOTEL          = "hotel"
+    SITE_EXPENSES  = "site_expenses"
+    OTHER          = "other"
 
 
 class DecisionType(str, Enum):
@@ -145,6 +147,7 @@ class ClaimState(TypedDict, total=False):
     error_message:         Optional[str]
     processing_complete:   bool
     test_mode:             bool
+    admin_judgment_failed: bool  # True when LLM call failed — forces pending_review
 
 
 def create_initial_state(
@@ -181,6 +184,13 @@ def create_initial_state(
         Initialized ClaimState
     """
     from datetime import datetime
+
+    if not claim_id:
+        raise ValueError("claim_id must be non-empty")
+    if not employee_id:
+        raise ValueError("employee_id must be non-empty")
+    if claimed_amount <= 0:
+        raise ValueError(f"claimed_amount must be positive, got {claimed_amount}")
 
     return ClaimState(
         # Identification
@@ -257,4 +267,16 @@ def create_initial_state(
         error_message=None,
         processing_complete=False,
         test_mode=False,
+        admin_judgment_failed=False,
     )
+
+
+def require_fields(state: "ClaimState", agent_name: str, *fields: str) -> None:
+    """Raise ValueError if any required field is absent or None in state.
+    Call at the top of each agent node to catch missing upstream data early.
+    """
+    missing = [f for f in fields if state.get(f) is None]
+    if missing:
+        raise ValueError(
+            f"[{agent_name}] Missing required state fields: {', '.join(missing)}"
+        )

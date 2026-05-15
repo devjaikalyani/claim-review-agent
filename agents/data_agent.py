@@ -33,21 +33,35 @@ _SUMMARY_CAT_MAP: Dict[str, str] = {
     "fasttag":          ExpenseCategory.FASTTAG.value,
     "two_wheeler":      ExpenseCategory.TWO_WHEELER.value,
     "fuel_bill":        ExpenseCategory.TWO_WHEELER.value,
+    "hotel":            ExpenseCategory.HOTEL.value,
+    "car_conveyance":   ExpenseCategory.CAR_CONVEYANCE.value,
     "other":            ExpenseCategory.OTHER.value,
     # extra aliases that may appear if LLM uses the voucher's raw Expense Head names
-    "ac_bus":           ExpenseCategory.BUS_TRAVEL.value,
-    "ac bus":           ExpenseCategory.BUS_TRAVEL.value,
-    "sleeper_class":    ExpenseCategory.BUS_TRAVEL.value,
-    "sleeper class":    ExpenseCategory.BUS_TRAVEL.value,
-    "sleeper_class_train": ExpenseCategory.BUS_TRAVEL.value,
-    "auto":             ExpenseCategory.BUS_TRAVEL.value,
-    "2_wheeler":        ExpenseCategory.TWO_WHEELER.value,
-    "2 wheeler":        ExpenseCategory.TWO_WHEELER.value,
-    "food_allowance":   ExpenseCategory.FOOD.value,
-    "food allowance":   ExpenseCategory.FOOD.value,
-    "da":               ExpenseCategory.FOOD.value,
-    "other_expense":    ExpenseCategory.OTHER.value,
-    "other expense":    ExpenseCategory.OTHER.value,
+    "ac_bus":                ExpenseCategory.BUS_TRAVEL.value,
+    "ac bus":                ExpenseCategory.BUS_TRAVEL.value,
+    "sleeper_class":         ExpenseCategory.BUS_TRAVEL.value,
+    "sleeper class":         ExpenseCategory.BUS_TRAVEL.value,
+    "sleeper_class_train":   ExpenseCategory.BUS_TRAVEL.value,
+    "auto":                  ExpenseCategory.BUS_TRAVEL.value,
+    "2_wheeler":             ExpenseCategory.TWO_WHEELER.value,
+    "2 wheeler":             ExpenseCategory.TWO_WHEELER.value,
+    "food_allowance":        ExpenseCategory.FOOD.value,
+    "food allowance":        ExpenseCategory.FOOD.value,
+    "da":                    ExpenseCategory.FOOD.value,
+    "hotel_accommodation":   ExpenseCategory.HOTEL.value,
+    "hotel accommodation":   ExpenseCategory.HOTEL.value,
+    "accommodation":         ExpenseCategory.HOTEL.value,
+    "lodge":                 ExpenseCategory.HOTEL.value,
+    "guest_house":           ExpenseCategory.HOTEL.value,
+    "guest house":           ExpenseCategory.HOTEL.value,
+    "car":                   ExpenseCategory.CAR_CONVEYANCE.value,
+    "car_fuel":              ExpenseCategory.CAR_CONVEYANCE.value,
+    "car fuel":              ExpenseCategory.CAR_CONVEYANCE.value,
+    "vehicle":               ExpenseCategory.CAR_CONVEYANCE.value,
+    "toll":                  ExpenseCategory.FASTTAG.value,
+    "toll_charges":          ExpenseCategory.FASTTAG.value,
+    "other_expense":         ExpenseCategory.OTHER.value,
+    "other expense":         ExpenseCategory.OTHER.value,
 }
 
 
@@ -233,6 +247,16 @@ def _build_from_receipts(state: ClaimState) -> None:
     # Near-duplicate detection (receipt + UPI for the same transaction) is handled
     # by the admin judgment agent which has LLM reasoning and training examples.
 
+    # Resolve year hint once from claim period for partial-date normalisation
+    period_start = state.get("claim_period_start", "")
+    year_hint = 0
+    if period_start:
+        from datetime import datetime as _dt
+        try:
+            year_hint = _dt.fromisoformat(period_start).year
+        except ValueError:
+            pass
+
     # Group expenses by (category, amount, date, description) — exact match only
     groups: Dict[tuple, list] = {}
     for expense in expenses:
@@ -240,7 +264,7 @@ def _build_from_receipts(state: ClaimState) -> None:
         key = (
             expense["category"],
             expense["amount"],
-            _normalise_date(expense.get("date", "")),
+            _normalise_date(expense.get("date", ""), year_hint),
             desc_key,
         )
         groups.setdefault(key, []).append(expense)
@@ -373,15 +397,21 @@ def _vendor_prefix(expense: Dict[str, Any]) -> str:
     return first_word.lower().strip(".,;:-")
 
 
-def _normalise_date(date_str: str) -> str:
+def _normalise_date(date_str: str, year_hint: int = 0) -> str:
     """
     Normalise any date string to YYYY-MM-DD for reliable deduplication.
     Claude Vision may return DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD-Mon-YY, etc.
-    Returns the original string if no known format matches.
+
+    year_hint: fallback year (e.g. from claim_period_start) used for partial
+    dates like "25 Jan" that have no year component. Pass 0 to use the current year.
+
+    Returns "" when the date cannot be parsed so downstream dedup keys stay clean
+    rather than containing raw unparseable strings.
     """
     if not date_str or date_str.upper() in ("N/A", "NA", ""):
         return ""
     from datetime import datetime
+    # Full date formats (with year)
     for fmt in (
         "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y",
         "%d/%m/%y", "%d-%m-%y",
@@ -393,4 +423,15 @@ def _normalise_date(date_str: str) -> str:
             return datetime.strptime(date_str.strip(), fmt).strftime("%Y-%m-%d")
         except ValueError:
             continue
-    return date_str.strip()
+
+    # Partial date formats (no year) — infer year from claim period or current year
+    infer_year = year_hint if year_hint else datetime.now().year
+    for fmt in ("%d %b", "%d-%b", "%d/%b", "%d %B", "%d-%B"):
+        try:
+            d = datetime.strptime(f"{date_str.strip()} {infer_year}", f"{fmt} %Y")
+            return d.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    # Could not parse — return empty string; caller should not rely on raw strings
+    return ""

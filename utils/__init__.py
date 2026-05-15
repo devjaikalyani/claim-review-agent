@@ -1,4 +1,4 @@
-"""Utilities package for Claim Review System."""
+"""Utilities package for Rite Audit System."""
 
 def get_llm():
     from utils.llm import get_llm as _get_llm

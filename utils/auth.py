@@ -1,5 +1,5 @@
 """
-Authentication backend for the Claim Review Agent.
+Authentication backend for the Rite Audit System.
 
 Supported sign-in methods:
   - Email + Password
@@ -46,8 +46,10 @@ load_dotenv(Path(_ROOT).parent / ".env.shared")       # shared workspace credent
 load_dotenv(Path(_ROOT) / ".env", override=True)      # project-specific overrides
 _DEFAULT_DB = os.path.join(_ROOT, "auth.db")
 
-OTP_EXPIRY_MIN = 10
-SESSION_TTL_H  = int(os.getenv("SESSION_TTL_HOURS", "24"))
+OTP_EXPIRY_MIN    = 10
+SESSION_TTL_H     = int(os.getenv("SESSION_TTL_HOURS", "24"))
+_RATE_WINDOW_MIN  = 15   # rolling window for failed attempt counting
+_RATE_MAX_FAILS   = 5    # max failures before lockout
 
 
 # ── Database ───────────────────────────────────────────────────────────────────
@@ -63,6 +65,15 @@ def init_auth_db(path: str | None = None) -> None:
     """Create auth tables if they do not exist (idempotent)."""
     with _db(path) as conn:
         conn.executescript("""
+            CREATE TABLE IF NOT EXISTS login_attempts (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                identifier   TEXT NOT NULL,
+                attempted_at TEXT NOT NULL,
+                success      INTEGER DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_login_attempts
+                ON login_attempts(identifier, attempted_at);
+
             CREATE TABLE IF NOT EXISTS users (
                 id            TEXT PRIMARY KEY,
                 employee_id   TEXT UNIQUE NOT NULL,
@@ -245,6 +256,47 @@ def logout_session(token: str | None, path: str | None = None) -> None:
         return
     with _db(path) as conn:
         conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+
+def _record_attempt(identifier: str, success: bool, path: str | None = None) -> None:
+    """Log a login attempt (success or failure) for rate-limit tracking."""
+    with _db(path) as conn:
+        conn.execute(
+            "INSERT INTO login_attempts (identifier, attempted_at, success) VALUES (?, ?, ?)",
+            (identifier.lower(), datetime.now().isoformat(), 1 if success else 0),
+        )
+
+
+def _check_rate_limit(identifier: str, path: str | None = None) -> Dict[str, Any]:
+    """
+    Return {"locked": True, "minutes_left": N} if the identifier has hit the
+    failure threshold within the rolling window, else {"locked": False}.
+    """
+    window_start = (datetime.now() - timedelta(minutes=_RATE_WINDOW_MIN)).isoformat()
+    key = identifier.lower()
+    with _db(path) as conn:
+        fail_count = conn.execute(
+            "SELECT COUNT(*) FROM login_attempts "
+            "WHERE identifier=? AND attempted_at>? AND success=0",
+            (key, window_start),
+        ).fetchone()[0]
+
+        if fail_count >= _RATE_MAX_FAILS:
+            # Unlock when the oldest failure in the window ages out
+            oldest = conn.execute(
+                "SELECT attempted_at FROM login_attempts "
+                "WHERE identifier=? AND attempted_at>? AND success=0 "
+                "ORDER BY attempted_at ASC LIMIT 1",
+                (key, window_start),
+            ).fetchone()
+            if oldest:
+                unlock_at  = datetime.fromisoformat(oldest[0]) + timedelta(minutes=_RATE_WINDOW_MIN)
+                mins_left  = max(1, int((unlock_at - datetime.now()).total_seconds() / 60))
+                return {"locked": True, "minutes_left": mins_left}
+
+    return {"locked": False}
 
 
 # ── Password helpers ───────────────────────────────────────────────────────────
@@ -463,10 +515,15 @@ def login_password(identifier: str, password: str,
     Returns {'success': True, 'user': {...}, 'token': str} or {'error': str}.
     """
     identifier = identifier.strip()
+    limit_check = _check_rate_limit(identifier, path)
+    if limit_check.get("locked"):
+        return {"error": f"Too many failed attempts. Please wait {limit_check['minutes_left']} minute(s) and try again."}
+
     user = get_user("email", identifier.lower(), path)
     if not user:
         user = get_user("employee_id", identifier.upper(), path)
     if not user:
+        _record_attempt(identifier, success=False, path=path)
         return {"error": "No account found with that email or Employee ID."}
 
     stored = user.get("password_hash") or (
@@ -477,8 +534,10 @@ def login_password(identifier: str, password: str,
         return {"error": "This account has no password set. "
                          "Please sign in with OTP, Google, or Zoho."}
     if not _verify_pw(password, stored):
+        _record_attempt(identifier, success=False, path=path)
         return {"error": "Incorrect password."}
 
+    _record_attempt(identifier, success=True, path=path)
     _touch(user["id"], path)
     token = create_session(user["id"], path)
     return {"success": True, "user": user, "token": token}
@@ -557,12 +616,17 @@ def send_email_otp(email: str, path: str | None = None) -> Dict[str, Any]:
 def login_email_otp(email: str, code: str,
                     path: str | None = None) -> Dict[str, Any]:
     email = email.strip().lower()
+    limit_check = _check_rate_limit(email, path)
+    if limit_check.get("locked"):
+        return {"error": f"Too many failed attempts. Please wait {limit_check['minutes_left']} minute(s) and try again."}
     res = _verify_otp_code(email, code, "login", path)
     if res.get("error"):
+        _record_attempt(email, success=False, path=path)
         return res
     user = get_user("email", email, path)
     if not user:
         return {"error": "No account found for this email."}
+    _record_attempt(email, success=True, path=path)
     _touch(user["id"], path)
     token = create_session(user["id"], path)
     return {"success": True, "user": user, "token": token}
@@ -608,12 +672,17 @@ def send_phone_otp(phone: str, path: str | None = None) -> Dict[str, Any]:
 def login_phone_otp(phone: str, code: str,
                     path: str | None = None) -> Dict[str, Any]:
     phone = phone.strip()
+    limit_check = _check_rate_limit(phone, path)
+    if limit_check.get("locked"):
+        return {"error": f"Too many failed attempts. Please wait {limit_check['minutes_left']} minute(s) and try again."}
     res = _verify_otp_code(phone, code, "login", path)
     if res.get("error"):
+        _record_attempt(phone, success=False, path=path)
         return res
     user = get_user("phone", phone, path)
     if not user:
         return {"error": "No account found for this phone number."}
+    _record_attempt(phone, success=True, path=path)
     _touch(user["id"], path)
     token = create_session(user["id"], path)
     return {"success": True, "user": user, "token": token}

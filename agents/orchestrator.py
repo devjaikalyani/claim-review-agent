@@ -53,7 +53,7 @@ def orchestrator_agent(state: ClaimState) -> ClaimState:
     images = state.get("images", [])
     documents = state.get("documents", [])
     
-    if not images and not documents:
+    if not images and not documents and not state.get("vision_data"):
         issues.append("No supporting documents or images provided")
     
     # Check if claim requires manager approval

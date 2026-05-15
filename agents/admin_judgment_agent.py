@@ -15,16 +15,42 @@ How it works:
   5. Rebuild categories so calculator gets clean, pre-judged data
 """
 import json
+import hashlib
 from typing import Dict, Any, List
 from agents.state import ClaimState
 from config.policy import REIMBURSEMENT_POLICY
-from utils.training_db import get_examples, get_paired_examples, get_rejection_patterns, get_stats
+from utils.training_db import (
+    get_examples, get_paired_examples, get_rejection_patterns, get_stats,
+    has_sufficient_examples, get_rule_based_judgment,
+)
+
+
+def _get_policy_hash() -> str:
+    """Return a short hash of the current policy config.
+    Embedding this in the system prompt ensures Anthropic's prompt cache is
+    automatically invalidated whenever policy rates or limits change — no manual
+    TTL management required.
+    """
+    policy_repr = json.dumps(
+        {
+            k: {
+                "monthly_limit": v.monthly_limit,
+                "rate_per_km":   v.rate_per_km,
+                "daily_limit":   v.daily_limit,
+            }
+            for k, v in REIMBURSEMENT_POLICY.items()
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(policy_repr.encode()).hexdigest()[:12]
 
 
 def _build_static_system_prompt() -> str:
     """Build the static (per-company) system prompt once at module load.
     This string never changes between claims, so Anthropic's prompt cache
     will serve hits for every claim after the first within the 5-min TTL window.
+    The embedded policy checksum ensures the cache is busted automatically
+    when any rate or limit in config/policy.py changes.
     """
     policy_lines = []
     for cat_key, policy in REIMBURSEMENT_POLICY.items():
@@ -38,6 +64,7 @@ def _build_static_system_prompt() -> str:
     policy_summary = "\n".join(policy_lines) or "  See company policy document."
 
     return f"""You are an experienced finance admin at Rite Water Solutions India Limited, a water infrastructure company with field employees who travel to project sites, buy materials, stay in hotels/guest houses, and claim fuel expenses.
+Policy checksum: {_get_policy_hash()}
 
 Your role: review employee expense claim items and decide which to approve, partially approve, or reject — exactly as a senior finance admin would.
 
@@ -95,6 +122,11 @@ Return a JSON array — one object per item. Each object must have:
   "decision"        : "approve" | "reject" | "partial"
   "approved_amount" : numeric — full amount for approve, reduced amount for partial, 0 for reject
   "reason"          : brief explanation — required for reject and partial, optional for approve
+  "confidence"      : float 0.0–1.0 — your confidence in this specific decision
+                        0.9–1.0  clear-cut case (obvious approval or clear policy violation)
+                        0.7–0.89 reasonable certainty (standard policy case, good evidence)
+                        0.5–0.69 uncertain (edge case, vague description, missing context)
+                        below 0.5 very uncertain — flag for careful admin review
 
 Return ONLY the JSON array. No markdown fences. No text before or after the array."""
 
@@ -280,27 +312,62 @@ def admin_judgment_agent(state: ClaimState) -> ClaimState:
         f"Return your decisions as a JSON array now."
     )
 
+    # Apply rule-based judgment for categories with insufficient training examples
+    # before sending to LLM, so the LLM only handles well-represented categories.
+    sparse_decisions = []
+    llm_expenses     = []
+    for i, e in enumerate(expenses):
+        cat = e.get("category", "other")
+        if not has_sufficient_examples(cat):
+            rb = get_rule_based_judgment(cat, e.get("amount", 0), e.get("description", ""))
+            rb["item_index"] = i
+            sparse_decisions.append(rb)
+        else:
+            llm_expenses.append((i, e))
+
     try:
         from utils.llm import get_llm
         llm      = get_llm()
         response = llm.invoke(prompt, system_prompt=_STATIC_SYSTEM_PROMPT, max_tokens=2048)
         decisions = _parse_decisions(response)
 
-        if decisions:
-            rejected_items = _apply_decisions(state, expenses, decisions)
+        # Merge LLM decisions with rule-based decisions for sparse categories
+        all_decisions = sparse_decisions + decisions
+
+        if all_decisions:
+            rejected_items = _apply_decisions(state, expenses, all_decisions)
             state["admin_judgment_applied"] = True
+            rb_count  = len(sparse_decisions)
+            llm_count = len(decisions)
             state["admin_judgment_note"] = (
-                f"Admin judgment applied using {stats['total']} training examples "
-                f"({stats['vouchers']} vouchers). "
+                f"Admin judgment applied: {llm_count} LLM decision(s) "
+                f"(using {stats['total']} training examples, {stats['vouchers']} vouchers), "
+                f"{rb_count} rule-based decision(s) for categories with sparse training data. "
                 f"{len(rejected_items)} item(s) rejected."
             )
             if rejected_items:
                 state.setdefault("duplicates_removed", []).extend(rejected_items)
         else:
-            state["admin_judgment_note"] = "LLM returned no decisions — rule-based fallback applied."
+            # LLM returned nothing and no sparse decisions — force pending review
+            state["admin_judgment_failed"] = True
+            state["decision"]             = "pending_review"
+            state["admin_judgment_note"]  = (
+                "LLM returned no decisions and no rule-based fallback applied. "
+                "Claim requires manual admin review."
+            )
 
     except Exception as exc:
-        state["admin_judgment_note"] = f"Judgment agent error: {exc}. Rule-based fallback applied."
+        # LLM call failed — do NOT let expenses silently pass through as approved.
+        # Force the claim to pending_review so a human admin must decide.
+        state["admin_judgment_failed"] = True
+        state["decision"]             = "pending_review"
+        state["admin_judgment_note"]  = (
+            f"Judgment agent error: {exc}. "
+            "Claim flagged for mandatory manual admin review — no auto-approval."
+        )
+        # Apply rule-based decisions for any sparse categories that were already computed
+        if sparse_decisions:
+            _apply_decisions(state, expenses, sparse_decisions)
 
     return state
 
@@ -416,9 +483,12 @@ def _apply_decisions(state: ClaimState,
 
         action = dec.get("decision", "approve")
 
+        confidence = min(1.0, max(0.0, float(dec.get("confidence") or 1.0)))
+
         if action == "reject":
-            expense["is_valid"]         = False
-            expense["validation_notes"] = dec.get("reason", "Rejected by admin judgment")
+            expense["is_valid"]          = False
+            expense["validation_notes"]  = dec.get("reason", "Rejected by admin judgment")
+            expense["system_confidence"] = confidence
             rejected_desc.append(
                 f"{expense.get('description', 'Expense')} — "
                 f"₹{expense.get('amount', 0):,.2f} on {expense.get('date', 'unknown date')} "
@@ -426,20 +496,23 @@ def _apply_decisions(state: ClaimState,
             )
             # Store structured rejected item for admin review dashboard
             state.setdefault("rejected_expenses", []).append({
-                "description":  expense.get("description", ""),
-                "date":         expense.get("date", ""),
-                "category":     expense.get("category", ""),
-                "amount":       expense.get("amount", 0),
+                "description":     expense.get("description", ""),
+                "date":            expense.get("date", ""),
+                "category":        expense.get("category", ""),
+                "amount":          expense.get("amount", 0),
                 "system_decision": "reject",
                 "system_reason":   dec.get("reason", "Rejected by admin judgment"),
-                "source_type":  expense.get("source_type", "receipt"),
+                "system_confidence": confidence,
+                "source_type":     expense.get("source_type", "receipt"),
             })
         elif action == "partial":
             adj = float(dec.get("approved_amount") or expense["amount"])
-            expense["amount"]           = adj
-            expense["validation_notes"] = dec.get("reason", "Partially approved")
+            expense["amount"]            = adj
+            expense["validation_notes"]  = dec.get("reason", "Partially approved")
+            expense["system_confidence"] = confidence
             approved_list.append(expense)
         else:
+            expense["system_confidence"] = confidence
             approved_list.append(expense)
 
     # Rebuild categories from approved list

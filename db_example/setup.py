@@ -1,5 +1,5 @@
 """
-Fresh database setup script for Claim Review Agent.
+Fresh database setup script for Rite Audit System.
 Creates auth.db, claims.db, and data/training.db from scratch with sample data.
 
 Run from the project root:

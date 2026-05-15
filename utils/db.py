@@ -1,5 +1,5 @@
 """
-Database utilities for Claim Review Agent.
+Database utilities for Rite Audit System.
 
 Provides SQLite-based storage for claim history and audit trail.
 """
@@ -109,6 +109,30 @@ class ClaimDatabase:
         for col, col_def in migrations.items():
             if col not in existing:
                 cursor.execute(f"ALTER TABLE claims ADD COLUMN {col} {col_def}")
+
+        # Admin decision history — full before/after audit trail for every override
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS admin_decision_history (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_id             TEXT NOT NULL,
+                changed_by           TEXT,
+                old_approved_amount  REAL,
+                new_approved_amount  REAL,
+                old_status           TEXT,
+                new_status           TEXT DEFAULT 'admin_reviewed',
+                notes                TEXT,
+                changed_at           TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (claim_id) REFERENCES claims(id)
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_adh_claim_id ON admin_decision_history(claim_id)"
+        )
+
+        # Indexes for admin dashboard queries
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_claims_admin_status ON claims(admin_status, created_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_claims_employee_id  ON claims(employee_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_claims_created_at   ON claims(created_at)")
 
         self.conn.commit()
     
@@ -334,17 +358,31 @@ class ClaimDatabase:
         
         return [dict(row) for row in cursor.fetchall()]
     
-    def get_all_claims(self, status_filter: str = None, limit: int = 200) -> List[Dict[str, Any]]:
-        """Return all claims for the admin dashboard, newest first."""
+    def get_all_claims(self, status_filter: str = None, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """Return paginated claims for the admin dashboard, newest first."""
         cursor = self.conn.cursor()
         if status_filter and status_filter != "all":
             cursor.execute(
-                "SELECT * FROM claims WHERE admin_status=? ORDER BY created_at DESC LIMIT ?",
-                (status_filter, limit),
+                "SELECT * FROM claims WHERE admin_status=? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (status_filter, limit, offset),
             )
         else:
-            cursor.execute("SELECT * FROM claims ORDER BY created_at DESC LIMIT ?", (limit,))
+            cursor.execute(
+                "SELECT * FROM claims ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
         return [dict(r) for r in cursor.fetchall()]
+
+    def count_claims(self, status_filter: str = None) -> int:
+        """Count total claims for pagination."""
+        cursor = self.conn.cursor()
+        if status_filter and status_filter != "all":
+            row = cursor.execute(
+                "SELECT COUNT(*) FROM claims WHERE admin_status=?", (status_filter,)
+            ).fetchone()
+        else:
+            row = cursor.execute("SELECT COUNT(*) FROM claims").fetchone()
+        return row[0] if row else 0
 
     def get_claim_stats(self) -> Dict[str, Any]:
         """Summary stats for the dashboard header."""
@@ -355,7 +393,14 @@ class ClaimDatabase:
                 SUM(CASE WHEN admin_status='pending_review' THEN 1 ELSE 0 END) AS pending,
                 SUM(claimed_amount)                             AS total_claimed,
                 SUM(approved_amount)                           AS total_system_approved,
-                SUM(COALESCE(admin_approved_amount, approved_amount)) AS total_final_approved
+                SUM(COALESCE(admin_approved_amount, approved_amount)) AS total_final_approved,
+                SUM(CASE WHEN admin_approved_amount IS NOT NULL
+                          AND ABS(admin_approved_amount - COALESCE(approved_amount, 0)) > 0.5
+                     THEN 1 ELSE 0 END)                        AS total_overrides,
+                ROUND(AVG(CASE WHEN admin_reviewed_at IS NOT NULL
+                               AND submission_date IS NOT NULL
+                               THEN julianday(admin_reviewed_at) - julianday(submission_date)
+                          END), 1)                             AS avg_review_days
             FROM claims
         """).fetchone()
         return dict(row) if row else {}
@@ -365,22 +410,51 @@ class ClaimDatabase:
         claim_id: str,
         admin_approved_amount: float,
         admin_notes: str = "",
+        changed_by: str = "",
     ) -> None:
-        """Persist admin's final decision on a claim."""
+        """Persist admin's final decision on a claim and record full audit history."""
         cursor = self.conn.cursor()
+
+        # Read current state before overwriting (for audit trail)
+        current = cursor.execute(
+            "SELECT approved_amount, admin_approved_amount, admin_status FROM claims WHERE id=?",
+            (claim_id,),
+        ).fetchone()
+        old_amount = None
+        old_status = None
+        if current:
+            old_amount = current["admin_approved_amount"] if current["admin_approved_amount"] is not None \
+                         else current["approved_amount"]
+            old_status = current["admin_status"]
+
+        now = datetime.now().isoformat()
+
+        # Write audit history entry
+        cursor.execute("""
+            INSERT INTO admin_decision_history
+              (claim_id, changed_by, old_approved_amount, new_approved_amount,
+               old_status, new_status, notes, changed_at)
+            VALUES (?, ?, ?, ?, ?, 'admin_reviewed', ?, ?)
+        """, (claim_id, changed_by, old_amount, admin_approved_amount, old_status, admin_notes, now))
+
+        # Update the claim record
         cursor.execute("""
             UPDATE claims
             SET admin_approved_amount=?, admin_status='admin_reviewed',
                 admin_reviewed_at=?, admin_notes=?, updated_at=?
             WHERE id=?
-        """, (
-            admin_approved_amount,
-            datetime.now().isoformat(),
-            admin_notes,
-            datetime.now().isoformat(),
-            claim_id,
-        ))
+        """, (admin_approved_amount, now, admin_notes, now, claim_id))
+
         self.conn.commit()
+
+    def get_admin_decision_history(self, claim_id: str) -> List[Dict[str, Any]]:
+        """Return all admin override events for a claim, newest first."""
+        cursor = self.conn.cursor()
+        rows = cursor.execute(
+            "SELECT * FROM admin_decision_history WHERE claim_id=? ORDER BY changed_at DESC",
+            (claim_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_line_items(self, claim_id: str) -> List[Dict[str, Any]]:
         """Return stored line items for a claim (for admin review)."""

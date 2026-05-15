@@ -395,6 +395,240 @@ _SEED = [
      "description": "District-Palghar Block-Dahanu Village-jamshet For installation",
      "expense_date": "2026-03-30", "claimed_amount": 306.0, "approved_amount": 306.0,
      "decision": "approved", "rejection_reason": ""},
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SYNTHETIC SEED EXAMPLES — Hotel, FASTag, Food, Car Conveyance
+    # Added to balance training data across underrepresented categories.
+    # Based on real company policy rates and typical field employee scenarios.
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # ── HOTEL — Grade C cities (most common for field employees) ──────────────
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Hotel stay Nashik site visit — 2 nights",
+     "expense_date": "2026-01-10", "claimed_amount": 1400.0, "approved_amount": 1400.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Guest house Dhule project work — 3 nights",
+     "expense_date": "2026-01-12", "claimed_amount": 2100.0, "approved_amount": 2100.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Hotel Amravati site commissioning — 1 night",
+     "expense_date": "2026-01-15", "claimed_amount": 700.0, "approved_amount": 700.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Hotel Pune meeting with client — 1 night",
+     "expense_date": "2026-01-20", "claimed_amount": 1800.0, "approved_amount": 1500.0,
+     "decision": "partial",
+     "rejection_reason": "Pune is Grade A city; technician cap Rs.1,000/night; partial-approved at policy cap"},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Hotel Mumbai head office visit — 2 nights",
+     "expense_date": "2026-02-01", "claimed_amount": 3200.0, "approved_amount": 2000.0,
+     "decision": "partial",
+     "rejection_reason": "Mumbai is Grade A city; technician cap Rs.1,000/night x 2 nights = Rs.2,000; partial-approved at cap"},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Dharamshala/lodge Jalgaon side work — 4 nights",
+     "expense_date": "2026-02-05", "claimed_amount": 2800.0, "approved_amount": 2800.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Hotel stay without bill — overnight project work",
+     "expense_date": "2026-02-10", "claimed_amount": 1000.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "No hotel bill or receipt submitted; hotel claims require documentary proof"},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Guest house Aurangabad district office visit — 2 nights",
+     "expense_date": "2026-02-14", "claimed_amount": 1800.0, "approved_amount": 1800.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Hotel Nagpur 3 nights — project review",
+     "expense_date": "2026-02-20", "claimed_amount": 3300.0, "approved_amount": 3000.0,
+     "decision": "partial",
+     "rejection_reason": "Nagpur is Grade B; technician cap Rs.900/night x 3 = Rs.2,700; approved at Rs.3,000 (senior exec rate Rs.1,000/night)"},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Personal hotel stay — not on company work",
+     "expense_date": "2026-02-25", "claimed_amount": 1200.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "No business purpose stated; personal hotel stay not reimbursable"},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Lodge Chandrapur site deputation — 5 nights",
+     "expense_date": "2026-03-01", "claimed_amount": 3500.0, "approved_amount": 3500.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Hotel Nanded project handover — 1 night",
+     "expense_date": "2026-03-10", "claimed_amount": 850.0, "approved_amount": 850.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Hotel Hyderabad training program — 3 nights",
+     "expense_date": "2026-03-15", "claimed_amount": 9000.0, "approved_amount": 3000.0,
+     "decision": "partial",
+     "rejection_reason": "Hyderabad Grade A; technician cap Rs.1,000/night x 3; approved at policy cap Rs.3,000"},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Guest house Satara site work — 2 nights",
+     "expense_date": "2026-03-20", "claimed_amount": 1400.0, "approved_amount": 1400.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_HOTEL", "employee_code": "SEED", "category": "hotel",
+     "description": "Ashram/guest house Palghar village — 3 nights project work",
+     "expense_date": "2026-04-01", "claimed_amount": 1800.0, "approved_amount": 1800.0,
+     "decision": "approved", "rejection_reason": ""},
+
+    # ── FASTTAG / TOLL ────────────────────────────────────────────────────────
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Toll Mumbai-Pune expressway site visit",
+     "expense_date": "2026-01-08", "claimed_amount": 360.0, "approved_amount": 360.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "FASTag recharge for field travel Jan",
+     "expense_date": "2026-01-15", "claimed_amount": 500.0, "approved_amount": 500.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Toll Nashik-Dhule highway — project site",
+     "expense_date": "2026-01-22", "claimed_amount": 225.0, "approved_amount": 225.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Toll Nagpur-Amravati expressway",
+     "expense_date": "2026-02-03", "claimed_amount": 180.0, "approved_amount": 180.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "FASTag statement — 12 toll transactions mixed personal/work",
+     "expense_date": "2026-02-10", "claimed_amount": 1800.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "FASTag statement includes personal travel; no breakdown provided; rejected until itemised proof submitted"},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Toll Pune-Satara highway site commissioning",
+     "expense_date": "2026-02-18", "claimed_amount": 310.0, "approved_amount": 310.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Toll Jaipur ring road — head office visit",
+     "expense_date": "2026-03-05", "claimed_amount": 95.0, "approved_amount": 95.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Highway toll Kolhapur project — 4 trips",
+     "expense_date": "2026-03-12", "claimed_amount": 480.0, "approved_amount": 480.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "FASTag recharge monthly",
+     "expense_date": "2026-03-01", "claimed_amount": 3500.0, "approved_amount": 3000.0,
+     "decision": "partial",
+     "rejection_reason": "Monthly FASTag cap Rs.3,000; partial-approved at policy cap"},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Toll Navi Mumbai expressway — site work",
+     "expense_date": "2026-03-22", "claimed_amount": 270.0, "approved_amount": 270.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Toll booth cash payment — no FASTag receipt",
+     "expense_date": "2026-04-02", "claimed_amount": 150.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "No FASTag screenshot or toll receipt provided; cash toll claim not accepted without proof"},
+    {"voucher_no": "SEED_FASTTAG", "employee_code": "SEED", "category": "fasttag",
+     "description": "Expressway toll Latur site visit",
+     "expense_date": "2026-04-08", "claimed_amount": 410.0, "approved_amount": 410.0,
+     "decision": "approved", "rejection_reason": ""},
+
+    # ── FOOD — additional examples beyond the 3 in existing seed ─────────────
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Lunch and dinner Nashik site work 3 days",
+     "expense_date": "2026-01-10", "claimed_amount": 1200.0, "approved_amount": 1200.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "DA food allowance 5 days site deputation",
+     "expense_date": "2026-01-16", "claimed_amount": 2000.0, "approved_amount": 2000.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Team lunch 8 people client visit",
+     "expense_date": "2026-01-20", "claimed_amount": 3200.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "Team entertainment expenses not covered under individual food allowance policy"},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Dinner at Dhule site — overnight stay",
+     "expense_date": "2026-01-25", "claimed_amount": 380.0, "approved_amount": 380.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Food allowance 15 days field work",
+     "expense_date": "2026-02-01", "claimed_amount": 6000.0, "approved_amount": 6000.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "DA food allowance monthly — 22 travel days",
+     "expense_date": "2026-02-28", "claimed_amount": 8800.0, "approved_amount": 7000.0,
+     "decision": "partial",
+     "rejection_reason": "Monthly food cap Rs.7,000 for >15 travel days; partial-approved at cap"},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Breakfast and lunch Aurangabad — day trip no overnight stay",
+     "expense_date": "2026-02-12", "claimed_amount": 200.0, "approved_amount": 200.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Restaurant bill — personal dinner not on travel day",
+     "expense_date": "2026-02-20", "claimed_amount": 850.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "Receipt date does not correspond to any travel/site visit day in this claim period"},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Food DA 8 days Jalgaon project",
+     "expense_date": "2026-03-08", "claimed_amount": 3200.0, "approved_amount": 3200.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Tea/snacks petrol pump — travel day",
+     "expense_date": "2026-03-15", "claimed_amount": 120.0, "approved_amount": 120.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Swiggy order to home address",
+     "expense_date": "2026-03-22", "claimed_amount": 450.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "Delivery to home address — not a travel/site day meal"},
+    {"voucher_no": "SEED_FOOD", "employee_code": "SEED", "category": "food",
+     "description": "Hotel dinner Nanded site visit overnight",
+     "expense_date": "2026-03-28", "claimed_amount": 400.0, "approved_amount": 400.0,
+     "decision": "approved", "rejection_reason": ""},
+
+    # ── CAR CONVEYANCE ────────────────────────────────────────────────────────
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Car fuel Nashik to project site and back",
+     "expense_date": "2026-01-12", "claimed_amount": 2700.0, "approved_amount": 2700.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Petrol reimbursement Mumbai–Pune client visit 120 km",
+     "expense_date": "2026-01-18", "claimed_amount": 1080.0, "approved_amount": 1080.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Car conveyance monthly — 400 km verified Unolo",
+     "expense_date": "2026-01-31", "claimed_amount": 3600.0, "approved_amount": 3600.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Diesel for company project car — Dhule circle",
+     "expense_date": "2026-02-05", "claimed_amount": 4500.0, "approved_amount": 4500.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Car hire Nagpur airport to project site",
+     "expense_date": "2026-02-12", "claimed_amount": 1800.0, "approved_amount": 1800.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Car conveyance claimed without any fuel bill or GPS proof",
+     "expense_date": "2026-02-20", "claimed_amount": 5000.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "No fuel bill or distance proof submitted for car conveyance; required proof missing"},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Monthly car fuel — 1800 km unverified",
+     "expense_date": "2026-02-28", "claimed_amount": 16200.0, "approved_amount": 15000.0,
+     "decision": "partial",
+     "rejection_reason": "Car conveyance monthly cap Rs.15,000; partial-approved at policy cap"},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Petrol Aurangabad–Jalgaon project drive 300 km",
+     "expense_date": "2026-03-05", "claimed_amount": 2700.0, "approved_amount": 2700.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Taxi hire site visit — approved by manager",
+     "expense_date": "2026-03-12", "claimed_amount": 1500.0, "approved_amount": 1500.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Rapido cab local office commute — not business travel",
+     "expense_date": "2026-03-18", "claimed_amount": 320.0, "approved_amount": 0.0,
+     "decision": "rejected",
+     "rejection_reason": "Local home–office commute not reimbursable; car conveyance covers site/project travel only"},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Car fuel Pune region project — 500 km GPS verified",
+     "expense_date": "2026-03-25", "claimed_amount": 4500.0, "approved_amount": 4500.0,
+     "decision": "approved", "rejection_reason": ""},
+    {"voucher_no": "SEED_CAR", "employee_code": "SEED", "category": "car_conveyance",
+     "description": "Car hire Balaji Car Garage UPI ₹14970 verified",
+     "expense_date": "2026-04-02", "claimed_amount": 14970.0, "approved_amount": 14970.0,
+     "decision": "approved", "rejection_reason": ""},
 ]
 
 
@@ -424,7 +658,8 @@ def init_db() -> None:
         con.execute("CREATE INDEX IF NOT EXISTS idx_voucher  ON expense_decisions(voucher_no)")
 
         already = con.execute(
-            "SELECT COUNT(*) FROM expense_decisions WHERE voucher_no IN ('3134','3141','3416','3450')"
+            "SELECT COUNT(*) FROM expense_decisions WHERE voucher_no IN "
+            "('3134','3141','3416','3450','SEED_HOTEL','SEED_FASTTAG','SEED_FOOD','SEED_CAR')"
         ).fetchone()[0]
 
         if already == 0:
@@ -661,6 +896,51 @@ def get_stats() -> Dict[str, Any]:
         rejected = con.execute("SELECT COUNT(*) FROM expense_decisions WHERE decision='rejected'").fetchone()[0]
         vouchers = con.execute("SELECT COUNT(DISTINCT voucher_no) FROM expense_decisions").fetchone()[0]
         return {"total": total, "approved": approved, "rejected": rejected, "vouchers": vouchers}
+
+
+_SPARSE_THRESHOLD = 10  # minimum training examples before trusting LLM judgment for a category
+
+
+def has_sufficient_examples(category: str, threshold: int = _SPARSE_THRESHOLD) -> bool:
+    """Return True if the category has enough examples for reliable LLM judgment."""
+    init_db()
+    with _conn() as con:
+        count = con.execute(
+            "SELECT COUNT(*) FROM expense_decisions WHERE category=?", (category,)
+        ).fetchone()[0]
+    return count >= threshold
+
+
+def get_rule_based_judgment(category: str, amount: float, description: str = "") -> Dict[str, Any]:
+    """
+    Conservative rule-based judgment for categories with sparse training data.
+    Applies the monthly policy cap; otherwise approves at face value.
+    Confidence is kept low (0.55–0.65) so the admin knows this needs verification.
+    """
+    from config.policy import get_category_policy
+    policy = get_category_policy(category)
+    if policy.monthly_limit and amount > policy.monthly_limit:
+        return {
+            "decision":        "partial",
+            "approved_amount": policy.monthly_limit,
+            "reason":          (
+                f"Rule-based: amount ₹{amount:.0f} exceeds monthly policy cap "
+                f"₹{policy.monthly_limit:.0f} for {category}; approved at cap. "
+                "Admin should verify."
+            ),
+            "confidence":  0.65,
+            "rule_based":  True,
+        }
+    return {
+        "decision":        "approve",
+        "approved_amount": amount,
+        "reason":          (
+            f"Rule-based approval — insufficient training data for category '{category}'. "
+            "Admin should confirm this decision."
+        ),
+        "confidence":  0.55,
+        "rule_based":  True,
+    }
 
 
 # ── Internal ──────────────────────────────────────────────────────────────────

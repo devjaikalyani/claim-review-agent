@@ -1,5 +1,5 @@
 """
-LLM Utilities for Claim Review Agent
+LLM Utilities for Rite Audit System
 
 Uses Anthropic Claude for both reasoning and vision (real multimodal — no OCR pre-step).
 System prompts are cached with Anthropic prompt caching to reduce API costs.

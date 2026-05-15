@@ -42,7 +42,7 @@ def render_structured_report(
     st.markdown(
         '<div class="rpt-header-bar">'
         '<div class="rpt-company">Rite Water Solutions (India) Pvt. Ltd.</div>'
-        '<div class="rpt-doc-label">Expense Claim Review Report</div>'
+        '<div class="rpt-doc-label">Expense Rite Audit System Report</div>'
         '</div>',
         unsafe_allow_html=True,
     )

@@ -89,7 +89,7 @@ def writer_agent(state: ClaimState) -> ClaimState:
         if ai_voucher_review:
             reasoning_parts += [
                 "FULL APPROVAL",
-                f"AI Claim Review System verified all line items against company policy. "
+                f"Rite Audit System verified all line items against company policy. "
                 f"Full amount of Rs.{approved_amount:,.2f} approved.",
             ]
         elif has_voucher:
@@ -120,7 +120,7 @@ def writer_agent(state: ClaimState) -> ClaimState:
             f"PARTIAL APPROVAL  Claimed: Rs.{claimed_amount:,.2f} | "
             f"Approved: Rs.{approved_amount:,.2f} | "
             f"Reduction: Rs.{deduction:,.2f}",
-            "AI Claim Review System reviewed each line item against company policy.",
+            "Rite Audit System reviewed each line item against company policy.",
         ]
         if rejected_items or partial_items:
             reasoning_parts.append("Reasons for deduction:")
@@ -324,7 +324,7 @@ def _generate_report(
                 lines.append(f"    - {issue}")
     elif decision == DecisionType.FULL_APPROVAL.value:
         if ai_voucher_review:
-            lines.append("  AI Claim Review System verified all line items against company policy.")
+            lines.append("  Rite Audit System verified all line items against company policy.")
         elif has_voucher:
             lines.append("  All expenses are approved per the verified expense voucher.")
         else:
@@ -334,7 +334,7 @@ def _generate_report(
         line_decisions = state.get("voucher_line_decisions", [])
         rejected_items = [d for d in line_decisions if d.get("decision") == "reject"]
         partial_items  = [d for d in line_decisions if d.get("decision") == "partial"]
-        lines.append("  AI Claim Review System reviewed each line item against company policy.")
+        lines.append("  Rite Audit System reviewed each line item against company policy.")
         lines.append(f"  Approved: Rs.{approved_amount:,.2f}  |  Deduction: Rs.{deduction:,.2f}")
         if rejected_items or partial_items:
             lines.append("")
@@ -513,7 +513,7 @@ def _generate_report(
         partial_items  = [d for d in line_decisions if d.get("decision") == "partial"]
         if rejected_items or partial_items:
             recs.append(
-                f"Rs.{deduction:,.2f} was not approved by the AI Claim Review System due to "
+                f"Rs.{deduction:,.2f} was not approved by the Rite Audit System due to "
                 "policy violations or missing proof. See the itemised deductions above for details."
             )
     elif voucher_partial:
@@ -556,7 +556,7 @@ def _generate_report(
     lines += [
         divider("="),
         row("Report Generated", datetime.now().strftime("%d %b %Y  %H:%M:%S"), width=24),
-        row("Reviewed by",      "AI Claim Review System",                       width=24),
+        row("Reviewed by",      "Rite Audit System",                       width=24),
         row("Company",          "Rite Water Solutions (India) Pvt. Ltd.",       width=24),
         divider("="),
     ]

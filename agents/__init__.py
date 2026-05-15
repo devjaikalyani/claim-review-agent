@@ -1,4 +1,4 @@
-"""Agents package for Claim Review System."""
+"""Agents package for Rite Audit System."""
 
 # Import only state module initially - other imports happen when needed
 from agents.state import ClaimState, create_initial_state, ExpenseCategory, DecisionType

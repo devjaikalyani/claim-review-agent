@@ -1,4 +1,4 @@
-"""Config package for Claim Review Agent."""
+"""Config package for Rite Audit System."""
 from config.policy import (
     REIMBURSEMENT_POLICY,
     GENERAL_POLICY,
